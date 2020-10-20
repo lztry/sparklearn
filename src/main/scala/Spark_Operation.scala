@@ -62,23 +62,25 @@ class Spark_Operation {
 
   @Test
   def coalesce = {
-    //减少分区数 合并分区
-    val listRDD: RDD[Int] = sc.makeRDD(1 to 20, 4);
+    //减少分区数 合并分区 只能减少不能增加
+    val listRDD: RDD[Int] = sc.makeRDD(1 to 20, 5);
     listRDD.saveAsTextFile("output1")
     println(listRDD.partitions.size)
     //默认shuffle为false,shuffle慢需要将内容写到中间文件然后读文件到分区
     //没有shuffle一个分区可以认为就是task,有了读写task的数量会增多，读task和写task
 
-    println(listRDD.coalesce(2).partitions.size)
+    //println(listRDD.coalesce(2).partitions.size)
     //coalesce 将分区数据复制到其他分区,可能会发生数据倾斜
     listRDD.coalesce(2).saveAsTextFile("output2")
   }
 
   @Test
   def repartition(): Unit = {
+    //repartition 重新分区 shuffle 改变分区数量 可多可少
     val listRDD: RDD[Int] = sc.makeRDD(1 to 20, 4);
     //底层实现coalesce(numPartitions, shuffle = true) 打乱重组到分区
-    println(listRDD.repartition(2).partitions.size)
+    //println(listRDD.repartition(5).partitions.size)
+    listRDD.repartition(5).saveAsTextFile("output")
   }
 
   @Test
@@ -198,6 +200,68 @@ class Spark_Operation {
     rdd.aggregateByKey(0)((_ + _), (_ + _)).collect().foreach(println)
 
   }
+
+  @Test
+  def foldByKey = {
+    //foldByKey seqOp = combOp
+    val words = Array("one", "two", "two", "three", "three", "three")
+    val wordRDD: RDD[(String, Int)] = sc.makeRDD(words).map((_, 1))
+    val foldByKeyRDD: RDD[(String, Int)] = wordRDD.foldByKey(0)(_ + _)
+    foldByKeyRDD.collect().foreach(println)
+  }
+
+  @Test
+  def combineByKey = {
+    //combineByKey 与aggregateByKey 功能相似不同的是combineByKey 转变第一个 value 数据的数据类型
+    val input = sc.parallelize(Array(("a", 88), ("b", 95), ("a", 91), ("b", 93), ("a", 95), ("b", 98)), 2)
+    //根据key计算每种key的均值
+    //input.groupByKey().map(t=>(t._1,t._2.sum/t._2.size.toDouble)).collect().foreach(println)
+    //使用combineByKey 注意，转变的类型不能自动推断，需要声明类型
+    val combineByKeyRDD: RDD[(String, (Int, Int))] = input.combineByKey((_, 1),
+      (data: (Int, Int), v) => (data._1 + v, data._2 + 1), //分区间计算 ，计算完毕后数据都变为元祖
+      (data1: (Int, Int), data2: (Int, Int)) => (data1._1 + data2._1, data1._2 + data2._2))
+    //val resultRDD: RDD[(String, Double)] = combineByKeyRDD.map{case (key,value)=>(key,value._1/value._2.toDouble)}
+    val resultRDD: RDD[(String, Double)] = combineByKeyRDD.mapValues((v) => (v._1 / v._2.toDouble))
+    // combineByKeyRDD.map(case (key,value)=>(key,value._1,value._2)) 无法推断类型
+    resultRDD.collect().foreach(println)
+  }
+
+  @Test
+  def sortBykey = {
+    //sortByKey 通过K 排序 K必须实现Ordered接口
+    val rdd: RDD[(Int, String)] = sc.parallelize(Array((3, "aa"), (6, "cc"), (2, "bb"), (1, "dd")))
+    //true 从小到大
+    rdd.sortByKey(true).collect().foreach(println)
+  }
+
+  @Test
+  def mapValues = {
+    //mapValues 对value 进行操作
+    val rdd: RDD[(Int, String)] = sc.parallelize(Array((1, "a"), (1, "d"), (2, "b"), (3, "c")))
+    rdd.mapValues(_ + "|||").collect().foreach(println)
+  }
+
+  @Test
+  def join = {
+    //join 在类型为(K,V)和(K,W)的RDD上调用，返回一个相同key对应的所有元素对在一起的(K,(V,W))的RDD
+    //只返回二者共有的key
+    val rdd1 = sc.parallelize(Array((1, "a"), (2, "b"), (3, "c")))
+    val rdd2 = sc.parallelize(Array((1, 4), (2, 5), (3, 6), (8, 8)))
+    val joinRDD = rdd1.join(rdd2).join(rdd2)
+    joinRDD.collect().foreach(println)
+  }
+
+  @Test
+  def cogroup = {
+    //cogroup 在类型为(K,V)和(K,W)的RDD上调用，返回一个(K,(Iterable<V>,Iterable<W>))类型的RDD
+    // 没有的key补null,分左右
+    val rdd1 = sc.parallelize(Array((1, "a"), (2, "b"), (3, "c")))
+    val rdd2 = sc.parallelize(Array((1, 4), (2, 5), (3, 6), (8, 8)))
+    val cogroupRDD1: RDD[(Int, (Iterable[String], Iterable[Int]))] = rdd1.cogroup(rdd2)
+    cogroupRDD1.collect().foreach(println)
+    rdd2.cogroup(rdd1).collect().foreach(println)
+  }
+
 }
 
 //自定义分区器
