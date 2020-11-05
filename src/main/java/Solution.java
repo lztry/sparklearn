@@ -1,11 +1,11 @@
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Queue;
+import org.junit.Test;
+
 public class Solution {
-    public static void main(String[] args) {
-        Queue<String> queue = new LinkedList<>();
-        ArrayList<String> d = new ArrayList<>();
 
-
+    @Test
+    public void test() {
+        int a = Integer.MAX_VALUE;
+        System.out.println(a + 1);
     }
+
 }

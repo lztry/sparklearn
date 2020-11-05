@@ -13,7 +13,7 @@ class Spark_Oper_Map {
   @Test
   def map={
     val listRDD = sc.makeRDD(1 to 10)
-    //map 每个数据都会进行计算
+    //map 每个数据都会进行计算，每次遇到map 都发到执行器
     val mapRDD: RDD[Int] = listRDD.map(_*2)
     mapRDD.collect().foreach(println)
 
@@ -22,6 +22,7 @@ class Spark_Oper_Map {
   def mapPartitions={
     val listRDD = sc.makeRDD(1 to 10)
     //mapPartitions和 map不同，分区进行计算，效率更高，减少了IO,但是可能发生内存溢出
+    //一次处理一个分区，不能释放内存。
     val mapPartitionsRDD: RDD[Int] = listRDD.mapPartitions(_.map(_*2))
     //等价于
     //val mapPartitionsRDD: RDD[Int] = listRDD.mapPartitions(datas=>{datas.map(_*2)})
@@ -50,3 +51,4 @@ class Spark_Oper_Map {
   }
 
 }
+

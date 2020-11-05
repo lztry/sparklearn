@@ -1,5 +1,5 @@
 import org.apache.spark.rdd.RDD
-import org.apache.spark.{Partitioner, SparkConf, SparkContext}
+import org.apache.spark.{HashPartitioner, Partitioner, SparkConf, SparkContext}
 import org.junit.{Before, Test}
 
 class Spark_Operation {
@@ -38,7 +38,7 @@ class Spark_Operation {
   @Test
   def sample={
     val listRDD: RDD[Int] = sc.makeRDD(1 to 20,2)
-    //sample 抽样 在发生数据热点 数据不平衡问题时用来探测。
+    //sample 抽样 在发生数据热点 数据不平衡 数据倾斜 问题时用来探测。
     /*
          withReplacement表示是抽出的数据是否放回，true为有放回的抽样，false为无放回的抽样，
         seed用于指定随机数生成器种子。
@@ -158,9 +158,9 @@ class Spark_Operation {
     }.collect().foreach(println)
     println("---------------重新分区-----------------")
     //HashPartitioner 分区方式是对分区数进行求模,与hashmap 不同,Hashmap 使用& ，也可以自定义分区器
-    //val partitionRDD: RDD[(Int, Char)] = zipRDD.partitionBy(new HashPartitioner(2))
+    val partitionRDD: RDD[(Int, Char)] = zipRDD.partitionBy(new HashPartitioner(2))
     //partitionRDD.mapPartitionsWithIndex((num,datas)=>{datas.map((num,_))}).collect().foreach(println)
-    val partitionRDD: RDD[(Int, Char)] = zipRDD.partitionBy(new myPartitioner(3))
+    //val partitionRDD: RDD[(Int, Char)] = zipRDD.partitionBy(new myPartitioner(3))
     partitionRDD.mapPartitionsWithIndex((num, datas) => {
       datas.map((num, _))
     }).collect().foreach(println)
@@ -244,10 +244,10 @@ class Spark_Operation {
   @Test
   def join = {
     //join 在类型为(K,V)和(K,W)的RDD上调用，返回一个相同key对应的所有元素对在一起的(K,(V,W))的RDD
-    //只返回二者共有的key
-    val rdd1 = sc.parallelize(Array((1, "a"), (2, "b"), (3, "c")))
-    val rdd2 = sc.parallelize(Array((1, 4), (2, 5), (3, 6), (8, 8)))
-    val joinRDD = rdd1.join(rdd2).join(rdd2)
+    //只返回二者共有的key，相同key 进行笛卡尔乘积
+    val rdd1 = sc.parallelize(Array((1, "a"), (1, "b"), (3, "c")))
+    val rdd2 = sc.parallelize(Array((1, 4), (1, 5), (3, 6), (8, 8)))
+    val joinRDD = rdd1.join(rdd2).join(rdd1)
     joinRDD.collect().foreach(println)
   }
 
@@ -259,6 +259,7 @@ class Spark_Operation {
     val rdd2 = sc.parallelize(Array((1, 4), (2, 5), (3, 6), (8, 8)))
     val cogroupRDD1: RDD[(Int, (Iterable[String], Iterable[Int]))] = rdd1.cogroup(rdd2)
     cogroupRDD1.collect().foreach(println)
+
     rdd2.cogroup(rdd1).collect().foreach(println)
   }
 
